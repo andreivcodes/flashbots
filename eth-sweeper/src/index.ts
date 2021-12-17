@@ -66,7 +66,7 @@ async function ethsweeper() {
 
     const currentBalance = await provider.getBalance(walletSource.address);
 
-    let value = (await provider.getBalance(walletSource.address)).sub(
+    const value = (await provider.getBalance(walletSource.address)).sub(
       gasPrice.mul(21000)
     );
 
