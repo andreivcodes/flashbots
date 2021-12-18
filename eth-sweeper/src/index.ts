@@ -44,10 +44,14 @@ if (FLASHBOTS_RELAY_SIGNING_KEY === "") {
 
 async function ethsweeper() {
   const walletRelay = new Wallet(FLASHBOTS_RELAY_SIGNING_KEY);
-  const ETHEREUM_RPC_URL = process.env.ETHEREUM_RPC_URL;
-  const provider = new providers.StaticJsonRpcProvider(ETHEREUM_RPC_URL);
+  const FLASHBOTS_RPC_URL = process.env.FLASHBOTS_RPC_URL;
+  const INFURA_RPC_URL = process.env.INFURA_RPC_URL;
+  const providerInfura = new providers.StaticJsonRpcProvider(INFURA_RPC_URL);
+  const providerFlashbots = new providers.StaticJsonRpcProvider(
+    FLASHBOTS_RPC_URL
+  );
   const flashbotsProvider = await FlashbotsBundleProvider.create(
-    provider,
+    providerFlashbots,
     walletRelay
   );
 
@@ -59,12 +63,14 @@ async function ethsweeper() {
     | FlashbotsBundleRawTransaction
   )[];
 
-  provider.on("block", async (blockNumber) => {
-    const block = await provider.getBlock(blockNumber);
+  providerInfura.on("block", async (blockNumber) => {
+    const block = await providerInfura.getBlock(blockNumber);
 
     const gasPrice = PRIORITY_GAS_PRICE.add(block.baseFeePerGas || 0);
 
-    const currentBalance = await provider.getBalance(walletSource.address);
+    const currentBalance = await providerInfura.getBalance(
+      walletSource.address
+    );
 
     const sendValue = currentBalance.sub(gasPrice.mul(21000));
 
