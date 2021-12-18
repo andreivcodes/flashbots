@@ -68,7 +68,7 @@ async function ethsweeper() {
 
     const sendValue = currentBalance.sub(gasPrice.mul(21000));
 
-    console.log(`=================================`);
+    console.log(`=====${blockNumber}=====`);
     console.log(
       `current balance: ${ethers.utils.formatEther(currentBalance)} ETH`
     );
