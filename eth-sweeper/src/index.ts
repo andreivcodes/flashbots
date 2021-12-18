@@ -3,6 +3,8 @@ import {
   FlashbotsBundleRawTransaction,
   FlashbotsBundleResolution,
   FlashbotsBundleTransaction,
+  FlashbotsTransactionResponse,
+  RelayResponseError,
 } from "@flashbots/ethers-provider-bundle";
 import { BigNumber, providers, Wallet, ethers } from "ethers";
 import { checkSimulation, gasPriceToGwei, printTransactions } from "./utils";
@@ -14,7 +16,7 @@ require("log-timestamp");
 const BLOCKS_IN_FUTURE = 1;
 
 const GWEI = BigNumber.from(10).pow(9);
-const PRIORITY_GAS_PRICE = GWEI.mul(30);
+const PRIORITY_GAS_PRICE = GWEI.mul(50);
 
 const PRIVATE_KEY_SOURCE = process.env.PRIVATE_KEY_SOURCE || "";
 const PUBLIC_KEY_DESTINATION = process.env.PUBLIC_KEY_DESTINATION || "";
@@ -41,8 +43,6 @@ if (FLASHBOTS_RELAY_SIGNING_KEY === "") {
 }
 
 async function ethsweeper() {
-  let simulatedGasPrice = BigNumber.from(-100);
-
   const walletRelay = new Wallet(FLASHBOTS_RELAY_SIGNING_KEY);
   const ETHEREUM_RPC_URL = process.env.ETHEREUM_RPC_URL;
   const provider = new providers.StaticJsonRpcProvider(ETHEREUM_RPC_URL);
@@ -59,81 +59,71 @@ async function ethsweeper() {
     | FlashbotsBundleRawTransaction
   )[];
 
-  while (simulatedGasPrice < BigNumber.from(0)) {
-    const block = await provider.getBlock("latest");
+  provider.on("block", async (blockNumber) => {
+    const block = await provider.getBlock(blockNumber);
 
     const gasPrice = PRIORITY_GAS_PRICE.add(block.baseFeePerGas || 0);
 
     const currentBalance = await provider.getBalance(walletSource.address);
 
-    const value = (await provider.getBalance(walletSource.address)).sub(
-      gasPrice.mul(21000)
-    );
+    const sendValue = currentBalance.sub(gasPrice.mul(21000));
 
+    console.log(`=================================`);
     console.log(
-      `current balance: ${ethers.utils.formatEther(
-        currentBalance
-      )}ETH   current gas: ${gasPriceToGwei(
-        gasPrice
-      )}    current gas cost: ${gasPriceToGwei(
-        gasPrice.mul(21000)
-      )}    expected value: ${ethers.utils.formatEther(value)}ETH`
+      `current balance: ${ethers.utils.formatEther(currentBalance)} ETH`
+    );
+    console.log(
+      `current gas: ${gasPriceToGwei(block.baseFeePerGas as BigNumber)} gwei`
+    );
+    console.log(`current gas + bribe: ${gasPriceToGwei(gasPrice)} gwei`);
+    console.log(
+      `current gas cost: ${gasPriceToGwei(gasPrice.mul(21000))} gwei`
+    );
+    console.log(
+      `expected sent value: ${ethers.utils.formatEther(sendValue)} ETH`
     );
 
-    if (value > BigNumber.from(0)) {
+    if (sendValue > BigNumber.from(0)) {
       bundleTransactions = [
         {
           transaction: {
             to: PUBLIC_KEY_DESTINATION,
             gasPrice: gasPrice,
-            value: value,
+            value: sendValue,
             gasLimit: 21000,
           },
           signer: walletSource,
         },
       ];
       signedBundle = await flashbotsProvider.signBundle(bundleTransactions);
+
       await printTransactions(bundleTransactions, signedBundle);
-      simulatedGasPrice = await checkSimulation(
-        flashbotsProvider,
-        signedBundle
+
+      const targetBlockNumber = blockNumber + BLOCKS_IN_FUTURE;
+
+      const bundleResponse = await flashbotsProvider.sendBundle(
+        bundleTransactions,
+        targetBlockNumber
       );
 
-      console.log("simulatedGasPrice: " + simulatedGasPrice);
-    }
-  }
+      if ("error" in bundleResponse) {
+        console.log(
+          `error ${Error((bundleResponse as RelayResponseError).error.message)}`
+        );
+      }
 
-  provider.on("block", async (blockNumber) => {
-    const simulatedGasPrice = await checkSimulation(
-      flashbotsProvider,
-      signedBundle
-    );
-    const targetBlockNumber = blockNumber + BLOCKS_IN_FUTURE;
-    console.log(
-      `Current Block Number: ${blockNumber},   Target Block Number:${targetBlockNumber},   gasPrice: ${gasPriceToGwei(
-        simulatedGasPrice
-      )} gwei`
-    );
-    const bundleResponse = await flashbotsProvider.sendBundle(
-      bundleTransactions,
-      targetBlockNumber
-    );
-    if ("error" in bundleResponse) {
-      throw new Error(bundleResponse.error.message);
-    }
-    const bundleResolution = await bundleResponse.wait();
-    if (bundleResolution === FlashbotsBundleResolution.BundleIncluded) {
-      console.log(`Congrats, included in ${targetBlockNumber}`);
-      process.exit(0);
-    } else if (
-      bundleResolution === FlashbotsBundleResolution.BlockPassedWithoutInclusion
-    ) {
-      console.log(`Not included in ${targetBlockNumber}`);
-    } else if (
-      bundleResolution === FlashbotsBundleResolution.AccountNonceTooHigh
-    ) {
-      console.log("Nonce too high, bailing");
-      process.exit(1);
+      const bundleResolution = await (
+        bundleResponse as FlashbotsTransactionResponse
+      ).wait();
+
+      if (bundleResolution === FlashbotsBundleResolution.BundleIncluded) {
+        console.log(`Congrats, included in ${targetBlockNumber}`);
+      } else if (
+        bundleResolution ===
+        FlashbotsBundleResolution.BlockPassedWithoutInclusion
+      ) {
+        console.log(`Not included in ${targetBlockNumber}`);
+      }
     }
   });
 }
