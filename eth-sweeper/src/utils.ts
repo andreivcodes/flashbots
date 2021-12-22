@@ -4,7 +4,7 @@ import {
   FlashbotsBundleTransaction,
 } from "@flashbots/ethers-provider-bundle";
 import { BigNumber } from "ethers";
-import { parseTransaction } from "ethers/lib/utils";
+import { parseTransaction, keccak256 } from "ethers/lib/utils";
 
 export const ETHER = BigNumber.from(10).pow(18);
 export const GWEI = BigNumber.from(10).pow(9);

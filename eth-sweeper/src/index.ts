@@ -7,16 +7,18 @@ import {
   RelayResponseError,
 } from "@flashbots/ethers-provider-bundle";
 import { BigNumber, providers, Wallet, ethers } from "ethers";
-import { checkSimulation, gasPriceToGwei, printTransactions } from "./utils";
+import { gasPriceToGwei, printTransactions } from "./utils";
 import { config } from "dotenv";
 config();
 
 require("log-timestamp");
 
 const BLOCKS_IN_FUTURE = 1;
+const SEND_MULTIPLE_TIMES = 1;
+const BRIBE = 30;
 
 const GWEI = BigNumber.from(10).pow(9);
-const PRIORITY_GAS_PRICE = GWEI.mul(50);
+let PRIORITY_GAS_PRICE = GWEI.mul(BRIBE);
 
 const PRIVATE_KEY_SOURCE = process.env.PRIVATE_KEY_SOURCE || "";
 const PUBLIC_KEY_DESTINATION = process.env.PUBLIC_KEY_DESTINATION || "";
@@ -47,12 +49,10 @@ async function ethsweeper() {
   const FLASHBOTS_RPC_URL = process.env.FLASHBOTS_RPC_URL;
   const INFURA_RPC_URL = process.env.INFURA_RPC_URL;
   const providerInfura = new providers.StaticJsonRpcProvider(INFURA_RPC_URL);
-  const providerFlashbots = new providers.StaticJsonRpcProvider(
-    FLASHBOTS_RPC_URL
-  );
   const flashbotsProvider = await FlashbotsBundleProvider.create(
-    providerFlashbots,
-    walletRelay
+    providerInfura,
+    walletRelay,
+    FLASHBOTS_RPC_URL
   );
 
   const walletSource = new Wallet(PRIVATE_KEY_SOURCE);
@@ -64,27 +64,43 @@ async function ethsweeper() {
   )[];
 
   providerInfura.on("block", async (blockNumber) => {
-    const block = await providerInfura.getBlock(blockNumber);
+    const block = await providerInfura.getBlock("latest");
+    const chain = await (await providerInfura.getNetwork()).chainId;
 
-    const gasPrice = PRIORITY_GAS_PRICE.add(block.baseFeePerGas || 0);
+    const maxBaseFeeInFutureBlock =
+      FlashbotsBundleProvider.getMaxBaseFeeInFutureBlock(
+        block.baseFeePerGas as BigNumber,
+        1
+      );
+
+    const priorityFee = PRIORITY_GAS_PRICE;
 
     const currentBalance = await providerInfura.getBalance(
       walletSource.address
     );
 
-    const sendValue = currentBalance.sub(gasPrice.mul(21000));
+    const gasUsed = 42000;
 
-    console.log(`=====${blockNumber}=====`);
+    const gasEstimateTotal = priorityFee
+      .add(maxBaseFeeInFutureBlock)
+      .mul(gasUsed);
+
+    const sendValue = currentBalance.sub(gasEstimateTotal);
+
+    console.log(`=====${blockNumber} on chainid ${chain}=====`);
     console.log(
       `current balance: ${ethers.utils.formatEther(currentBalance)} ETH`
     );
     console.log(
-      `current gas: ${gasPriceToGwei(block.baseFeePerGas as BigNumber)} gwei`
+      `base gas: ${gasPriceToGwei(block.baseFeePerGas as BigNumber)} gwei`
     );
-    console.log(`current gas + bribe: ${gasPriceToGwei(gasPrice)} gwei`);
     console.log(
-      `current gas cost: ${gasPriceToGwei(gasPrice.mul(21000))} gwei`
+      `base gas + bribe: ${gasPriceToGwei(
+        priorityFee.add(maxBaseFeeInFutureBlock)
+      )} gwei`
     );
+    console.log(`gas used: ${gasUsed}`);
+    console.log(`current gas cost: ${gasPriceToGwei(gasEstimateTotal)} gwei`);
     console.log(
       `expected sent value: ${ethers.utils.formatEther(sendValue)} ETH`
     );
@@ -92,13 +108,16 @@ async function ethsweeper() {
     if (sendValue > BigNumber.from(0)) {
       bundleTransactions = [
         {
+          signer: walletSource,
           transaction: {
             to: PUBLIC_KEY_DESTINATION,
-            gasPrice: gasPrice,
+            type: 2,
+            maxFeePerGas: priorityFee.add(maxBaseFeeInFutureBlock),
+            maxPriorityFeePerGas: priorityFee,
+            gasLimit: gasUsed,
+            chainId: chain,
             value: sendValue,
-            gasLimit: 21000,
           },
-          signer: walletSource,
         },
       ];
       signedBundle = await flashbotsProvider.signBundle(bundleTransactions);
@@ -107,31 +126,79 @@ async function ethsweeper() {
 
       const targetBlockNumber = blockNumber + BLOCKS_IN_FUTURE;
 
-      const bundleResponse = await flashbotsProvider.sendBundle(
-        bundleTransactions,
-        targetBlockNumber
-      );
+      await flashbotsProvider.simulate(signedBundle, targetBlockNumber);
 
-      if ("error" in bundleResponse) {
-        console.log(
-          `error ${Error((bundleResponse as RelayResponseError).error.message)}`
+      let tries = SEND_MULTIPLE_TIMES;
+      let triesPromises = [];
+      while (tries > 0) {
+        tries--;
+        triesPromises.push(
+          new Promise((res, rej) => {
+            sendBundle(
+              bundleTransactions,
+              targetBlockNumber,
+              flashbotsProvider,
+              chain
+            );
+          })
         );
       }
 
-      const bundleResolution = await (
-        bundleResponse as FlashbotsTransactionResponse
-      ).wait();
-
-      if (bundleResolution === FlashbotsBundleResolution.BundleIncluded) {
-        console.log(`Congrats, included in ${targetBlockNumber}`);
-      } else if (
-        bundleResolution ===
-        FlashbotsBundleResolution.BlockPassedWithoutInclusion
-      ) {
-        console.log(`Not included in ${targetBlockNumber}`);
-      }
+      Promise.all(triesPromises);
     }
   });
+}
+
+async function sendBundle(
+  bundleTransactions: (
+    | FlashbotsBundleTransaction
+    | FlashbotsBundleRawTransaction
+  )[],
+  targetBlockNumber: any,
+  flashbotsProvider: FlashbotsBundleProvider,
+  chain: number
+) {
+  const bundleResponse = await flashbotsProvider.sendBundle(
+    bundleTransactions,
+    targetBlockNumber
+  );
+
+  console.log(
+    `Bundle sent! ${
+      (bundleResponse as FlashbotsTransactionResponse).bundleHash
+    }`
+  );
+
+  if ("error" in bundleResponse) {
+    console.log(
+      `error ${Error((bundleResponse as RelayResponseError).error.message)}`
+    );
+  }
+
+  const bundleResolution = await (
+    bundleResponse as FlashbotsTransactionResponse
+  ).wait();
+
+  if (bundleResolution === FlashbotsBundleResolution.BundleIncluded) {
+    console.log(`Congrats, included in ${targetBlockNumber}`);
+    PRIORITY_GAS_PRICE = GWEI.mul(BRIBE);
+  } else if (
+    bundleResolution === FlashbotsBundleResolution.BlockPassedWithoutInclusion
+  ) {
+    console.log(`Not included in ${targetBlockNumber}`);
+
+    if (chain != 5)
+      //not on goerli testnet
+      console.log(
+        await flashbotsProvider.getBundleStats(
+          (bundleResponse as FlashbotsTransactionResponse).bundleHash,
+          targetBlockNumber
+        )
+      );
+
+    //if not included, increase bribe
+    PRIORITY_GAS_PRICE = PRIORITY_GAS_PRICE.add(GWEI.mul(10));
+  }
 }
 
 ethsweeper();
