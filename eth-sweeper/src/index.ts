@@ -14,7 +14,6 @@ config();
 require("log-timestamp");
 
 const BLOCKS_IN_FUTURE = 1;
-const SEND_MULTIPLE_TIMES = 1;
 const BRIBE = 30;
 
 const GWEI = BigNumber.from(10).pow(9);
@@ -128,77 +127,50 @@ async function ethsweeper() {
 
       await flashbotsProvider.simulate(signedBundle, targetBlockNumber);
 
-      let tries = SEND_MULTIPLE_TIMES;
-      let triesPromises = [];
-      while (tries > 0) {
-        tries--;
-        triesPromises.push(
-          new Promise((res, rej) => {
-            sendBundle(
-              bundleTransactions,
-              targetBlockNumber,
-              flashbotsProvider,
-              chain
-            );
-          })
+      const bundleResponse = await flashbotsProvider.sendBundle(
+        bundleTransactions,
+        targetBlockNumber
+      );
+
+      console.log(
+        `Bundle sent! ${
+          (bundleResponse as FlashbotsTransactionResponse).bundleHash
+        }`
+      );
+
+      if ("error" in bundleResponse) {
+        console.log(
+          `error ${Error((bundleResponse as RelayResponseError).error.message)}`
         );
       }
 
-      Promise.all(triesPromises);
+      const bundleResolution = await (
+        bundleResponse as FlashbotsTransactionResponse
+      ).wait();
+
+      if (bundleResolution === FlashbotsBundleResolution.BundleIncluded) {
+        console.log(`Congrats, included in ${targetBlockNumber}`);
+        PRIORITY_GAS_PRICE = GWEI.mul(BRIBE);
+      } else if (
+        bundleResolution ===
+        FlashbotsBundleResolution.BlockPassedWithoutInclusion
+      ) {
+        console.log(`Not included in ${targetBlockNumber}`);
+
+        if (chain != 5)
+          //not on goerli testnet
+          console.log(
+            await flashbotsProvider.getBundleStats(
+              (bundleResponse as FlashbotsTransactionResponse).bundleHash,
+              targetBlockNumber
+            )
+          );
+
+        //if not included, increase bribe
+        PRIORITY_GAS_PRICE = PRIORITY_GAS_PRICE.add(GWEI.mul(10));
+      }
     }
   });
-}
-
-async function sendBundle(
-  bundleTransactions: (
-    | FlashbotsBundleTransaction
-    | FlashbotsBundleRawTransaction
-  )[],
-  targetBlockNumber: any,
-  flashbotsProvider: FlashbotsBundleProvider,
-  chain: number
-) {
-  const bundleResponse = await flashbotsProvider.sendBundle(
-    bundleTransactions,
-    targetBlockNumber
-  );
-
-  console.log(
-    `Bundle sent! ${
-      (bundleResponse as FlashbotsTransactionResponse).bundleHash
-    }`
-  );
-
-  if ("error" in bundleResponse) {
-    console.log(
-      `error ${Error((bundleResponse as RelayResponseError).error.message)}`
-    );
-  }
-
-  const bundleResolution = await (
-    bundleResponse as FlashbotsTransactionResponse
-  ).wait();
-
-  if (bundleResolution === FlashbotsBundleResolution.BundleIncluded) {
-    console.log(`Congrats, included in ${targetBlockNumber}`);
-    PRIORITY_GAS_PRICE = GWEI.mul(BRIBE);
-  } else if (
-    bundleResolution === FlashbotsBundleResolution.BlockPassedWithoutInclusion
-  ) {
-    console.log(`Not included in ${targetBlockNumber}`);
-
-    if (chain != 5)
-      //not on goerli testnet
-      console.log(
-        await flashbotsProvider.getBundleStats(
-          (bundleResponse as FlashbotsTransactionResponse).bundleHash,
-          targetBlockNumber
-        )
-      );
-
-    //if not included, increase bribe
-    PRIORITY_GAS_PRICE = PRIORITY_GAS_PRICE.add(GWEI.mul(10));
-  }
 }
 
 ethsweeper();
