@@ -51,7 +51,7 @@ async function ethsweeper() {
   const providerFlashbots = new providers.StaticJsonRpcProvider(
     FLASHBOTS_RPC_URL
   );
-  const flashbotsProvider = await FlashbotsBundleProvider.create(
+  const flashbots = await FlashbotsBundleProvider.create(
     providerFlashbots,
     walletRelay
   );
@@ -121,15 +121,15 @@ async function ethsweeper() {
           },
         },
       ];
-      signedBundle = await flashbotsProvider.signBundle(bundleTransactions);
+      signedBundle = await flashbots.signBundle(bundleTransactions);
 
       await printTransactions(bundleTransactions, signedBundle);
 
       const targetBlockNumber = blockNumber + BLOCKS_IN_FUTURE;
 
-      await flashbotsProvider.simulate(signedBundle, targetBlockNumber);
+      await flashbots.simulate(signedBundle, targetBlockNumber);
 
-      const bundleResponse = await flashbotsProvider.sendBundle(
+      const bundleResponse = await flashbots.sendBundle(
         bundleTransactions,
         targetBlockNumber
       );
@@ -162,7 +162,7 @@ async function ethsweeper() {
         if (chain != 5)
           //not on goerli testnet
           console.log(
-            await flashbotsProvider.getBundleStats(
+            await flashbots.getBundleStats(
               (bundleResponse as FlashbotsTransactionResponse).bundleHash,
               targetBlockNumber
             )
