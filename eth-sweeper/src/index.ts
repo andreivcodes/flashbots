@@ -48,10 +48,12 @@ async function ethsweeper() {
   const FLASHBOTS_RPC_URL = process.env.FLASHBOTS_RPC_URL;
   const INFURA_RPC_URL = process.env.INFURA_RPC_URL;
   const providerInfura = new providers.StaticJsonRpcProvider(INFURA_RPC_URL);
-  const flashbotsProvider = await FlashbotsBundleProvider.create(
-    providerInfura,
-    walletRelay,
+  const providerFlashbots = new providers.StaticJsonRpcProvider(
     FLASHBOTS_RPC_URL
+  );
+  const flashbotsProvider = await FlashbotsBundleProvider.create(
+    providerFlashbots,
+    walletRelay
   );
 
   const walletSource = new Wallet(PRIVATE_KEY_SOURCE);
