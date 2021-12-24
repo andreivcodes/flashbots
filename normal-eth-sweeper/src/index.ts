@@ -86,7 +86,7 @@ async function ethsweeper() {
       signer
         .sendTransaction(tx)
         .then((transaction) => {
-          console.dir(transaction);
+          console.log(transaction);
           console.log("Send finished!");
         })
         .catch((err) => {
