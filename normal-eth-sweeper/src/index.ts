@@ -1,11 +1,11 @@
-import { BigNumber, providers, Wallet, ethers } from "ethers";
+import { BigNumber, providers, ethers } from "ethers";
 import { gasPriceToGwei } from "./utils";
 import { config } from "dotenv";
 config();
 
 require("log-timestamp");
 
-const BRIBE = 30;
+const BRIBE = 30; //in gwei
 
 const GWEI = BigNumber.from(10).pow(9);
 let PRIORITY_GAS_PRICE = GWEI.mul(BRIBE);
@@ -36,18 +36,16 @@ async function ethsweeper() {
     const block = await providerInfura.getBlock("latest");
     const chain = await (await providerInfura.getNetwork()).chainId;
 
+    // calculate the fee using fixed 21000 gas
     const maxBaseFeeInFutureBlock = block.baseFeePerGas as BigNumber;
-
     const priorityFee = PRIORITY_GAS_PRICE;
-
-    const currentBalance = await providerInfura.getBalance(signer.address);
-
     const gasUsed = 21000;
-
     const gasEstimateTotal = priorityFee
       .add(maxBaseFeeInFutureBlock)
       .mul(gasUsed);
 
+    // get the balance and calculate the remaining eth to be sent after fees
+    const currentBalance = await providerInfura.getBalance(signer.address);
     const sendValue = currentBalance.sub(gasEstimateTotal);
 
     console.log(`=====${blockNumber} on chainid ${chain}=====`);
@@ -68,7 +66,9 @@ async function ethsweeper() {
       `expected sent value: ${ethers.utils.formatEther(sendValue)} ETH`
     );
 
+    // if we still have any eth after fees estimation
     if (sendValue > BigNumber.from(0)) {
+      // create a tx
       const tx = {
         from: await signer.getAddress(),
         to: PUBLIC_KEY_DESTINATION,
@@ -83,6 +83,7 @@ async function ethsweeper() {
 
       console.log(tx);
 
+      // and send it
       signer
         .sendTransaction(tx)
         .then((transaction) => {

@@ -14,7 +14,7 @@ config();
 require("log-timestamp");
 
 const BLOCKS_IN_FUTURE = 1;
-const BRIBE = 30;
+const BRIBE = 30; // in gwei
 
 const GWEI = BigNumber.from(10).pow(9);
 let PRIORITY_GAS_PRICE = GWEI.mul(BRIBE);
@@ -68,24 +68,22 @@ async function ethsweeper() {
     const block = await providerInfura.getBlock("latest");
     const chain = await (await providerInfura.getNetwork()).chainId;
 
+    // calculate the fee using fixed 42000 gas. NOTE: 42000 is the minumum gas accepted by flashbots
     const maxBaseFeeInFutureBlock =
       FlashbotsBundleProvider.getMaxBaseFeeInFutureBlock(
         block.baseFeePerGas as BigNumber,
         1
       );
-
     const priorityFee = PRIORITY_GAS_PRICE;
-
-    const currentBalance = await providerInfura.getBalance(
-      walletSource.address
-    );
-
     const gasUsed = 42000;
-
     const gasEstimateTotal = priorityFee
       .add(maxBaseFeeInFutureBlock)
       .mul(gasUsed);
 
+    // get the balance and calculate the remaining eth to be sent after fees
+    const currentBalance = await providerInfura.getBalance(
+      walletSource.address
+    );
     const sendValue = currentBalance.sub(gasEstimateTotal);
 
     console.log(`=====${blockNumber} on chainid ${chain}=====`);
@@ -106,7 +104,9 @@ async function ethsweeper() {
       `expected sent value: ${ethers.utils.formatEther(sendValue)} ETH`
     );
 
+    // if we still have any eth after fees estimation
     if (sendValue > BigNumber.from(0)) {
+      // create a bundle
       bundleTransactions = [
         {
           signer: walletSource,
@@ -127,8 +127,10 @@ async function ethsweeper() {
 
       const targetBlockNumber = blockNumber + BLOCKS_IN_FUTURE;
 
+      // simulate it
       await flashbots.simulate(signedBundle, targetBlockNumber);
 
+      // then send it
       const bundleResponse = await flashbots.sendBundle(
         bundleTransactions,
         targetBlockNumber
@@ -160,7 +162,7 @@ async function ethsweeper() {
         console.log(`Not included in ${targetBlockNumber}`);
 
         if (chain != 5)
-          //not on goerli testnet
+          // not on goerli testnet
           console.log(
             await flashbots.getBundleStats(
               (bundleResponse as FlashbotsTransactionResponse).bundleHash,
@@ -168,7 +170,7 @@ async function ethsweeper() {
             )
           );
 
-        //if not included, increase bribe
+        // if not included, increase bribe
         PRIORITY_GAS_PRICE = PRIORITY_GAS_PRICE.add(GWEI.mul(10));
       }
     }
