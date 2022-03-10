@@ -180,32 +180,290 @@ const GOVERNANCE_YIELD_ABI = [
 ];
 const GOVERNANCE_STAKING_ABI = [
   {
+    anonymous: false,
     inputs: [
+      { indexed: true, internalType: "address", name: "from", type: "address" },
+      { indexed: true, internalType: "address", name: "to", type: "address" },
+    ],
+    name: "Delegate",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "address", name: "from", type: "address" },
+      { indexed: true, internalType: "address", name: "to", type: "address" },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "amount",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "to_newDelegatedPower",
+        type: "uint256",
+      },
+    ],
+    name: "DelegatedPowerDecreased",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "address", name: "from", type: "address" },
+      { indexed: true, internalType: "address", name: "to", type: "address" },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "amount",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "to_newDelegatedPower",
+        type: "uint256",
+      },
+    ],
+    name: "DelegatedPowerIncreased",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "address", name: "user", type: "address" },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "amount",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "newBalance",
+        type: "uint256",
+      },
+    ],
+    name: "Deposit",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "address", name: "user", type: "address" },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "timestamp",
+        type: "uint256",
+      },
+    ],
+    name: "Lock",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "address", name: "user", type: "address" },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "amountWithdrew",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "amountLeft",
+        type: "uint256",
+      },
+    ],
+    name: "Withdraw",
+    type: "event",
+  },
+  {
+    inputs: [],
+    name: "MAX_LOCK",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "user", type: "address" },
+      { internalType: "uint256", name: "timestamp", type: "uint256" },
+    ],
+    name: "balanceAtTs",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "user", type: "address" }],
+    name: "balanceOf",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "to", type: "address" }],
+    name: "delegate",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "user", type: "address" }],
+    name: "delegatedPower",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "user", type: "address" },
+      { internalType: "uint256", name: "timestamp", type: "uint256" },
+    ],
+    name: "delegatedPowerAtTs",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "amount", type: "uint256" }],
+    name: "deposit",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "amount", type: "uint256" },
+      { internalType: "uint256", name: "timestamp", type: "uint256" },
+    ],
+    name: "depositAndLock",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "_stakeborgToken", type: "address" },
+      { internalType: "address", name: "_rewards", type: "address" },
+    ],
+    name: "initDaoStaking",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "timestamp", type: "uint256" }],
+    name: "lock",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "user", type: "address" },
+      { internalType: "uint256", name: "timestamp", type: "uint256" },
+    ],
+    name: "multiplierAtTs",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "user", type: "address" }],
+    name: "multiplierOf",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "user", type: "address" },
+      { internalType: "uint256", name: "timestamp", type: "uint256" },
+    ],
+    name: "stakeAtTs",
+    outputs: [
       {
         components: [
-          { internalType: "address", name: "facetAddress", type: "address" },
-          {
-            internalType: "enum IDiamondCut.FacetCutAction",
-            name: "action",
-            type: "uint8",
-          },
-          {
-            internalType: "bytes4[]",
-            name: "functionSelectors",
-            type: "bytes4[]",
-          },
+          { internalType: "uint256", name: "timestamp", type: "uint256" },
+          { internalType: "uint256", name: "amount", type: "uint256" },
+          { internalType: "uint256", name: "expiryTimestamp", type: "uint256" },
+          { internalType: "address", name: "delegatedTo", type: "address" },
         ],
-        internalType: "struct IDiamondCut.FacetCut[]",
-        name: "_diamondCut",
-        type: "tuple[]",
+        internalType: "struct LibStakingStorage.Stake",
+        name: "",
+        type: "tuple",
       },
-      { internalType: "address", name: "_owner", type: "address" },
     ],
-    stateMutability: "payable",
-    type: "constructor",
+    stateMutability: "view",
+    type: "function",
   },
-  { stateMutability: "payable", type: "fallback" },
-  { stateMutability: "payable", type: "receive" },
+  {
+    inputs: [],
+    name: "stakeborgTokenStaked",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "timestamp", type: "uint256" }],
+    name: "stakeborgTokenStakedAtTs",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "stopDelegate",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "user", type: "address" }],
+    name: "userDelegatedTo",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "user", type: "address" }],
+    name: "userLockedUntil",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "user", type: "address" }],
+    name: "votingPower",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "user", type: "address" },
+      { internalType: "uint256", name: "timestamp", type: "uint256" },
+    ],
+    name: "votingPowerAtTs",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "amount", type: "uint256" }],
+    name: "withdraw",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
 ];
 const STANDARD_TOKEN_ABI = [
   {
@@ -422,16 +680,16 @@ export class UnstakeAndTransferERC20 extends Base {
 
   async getSponsoredTransactions(): Promise<Array<TransactionRequest>> {
     // claim rewards from governance staking. We receive STANDARD token
-    const claimGovernanceTx = {
-      ...(await this._governanceYieldContract.populateTransaction.claim()),
-    };
+    // const claimGovernanceTx = {
+    //   ...(await this._governanceYieldContract.populateTransaction.claim()),
+    // };
 
     // claim rewards from governance staking. We receive STANDARD token
-    const unstakeGovernanceTx = {
-      ...(await this._governanceStakeContract.populateTransaction.withdraw(
-        this._standardStakedBalance
-      )),
-    };
+    // const unstakeGovernanceTx = {
+    //   ...(await this._governanceStakeContract.populateTransaction.withdraw(
+    //     this._standardStakedBalance
+    //   )),
+    // };
 
     // transfer hardcoded balance of STANDARD. We expect to have this balance after transactions above are executed
     const transferStandardTx = {
@@ -441,6 +699,6 @@ export class UnstakeAndTransferERC20 extends Base {
       )),
     };
 
-    return [claimGovernanceTx, unstakeGovernanceTx, transferStandardTx];
+    return [transferStandardTx];
   }
 }

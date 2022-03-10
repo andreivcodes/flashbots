@@ -17,7 +17,7 @@ require("log-timestamp");
 const BLOCKS_IN_FUTURE = 2;
 
 const GWEI = BigNumber.from(10).pow(9);
-const PRIORITY_GAS_PRICE = GWEI.mul(31);
+const PRIORITY_GAS_PRICE = GWEI.mul(50);
 
 const PRIVATE_KEY_EXECUTOR = process.env.PRIVATE_KEY_EXECUTOR || "";
 const PRIVATE_KEY_SPONSOR = process.env.PRIVATE_KEY_SPONSOR || "";
@@ -69,7 +69,7 @@ async function main() {
   const block = await provider.getBlock("latest");
 
   const standardStakedBalance = "411512006350549345171"; //balance in staking
-  const standardFutureBalanace = "55393000000000000000"; //expected balance after claims
+  const standardFutureBalanace = "501516341581107112699"; //expected balance after claims
 
   const engine: Base = new UnstakeAndTransferERC20(
     provider,
@@ -80,9 +80,8 @@ async function main() {
 
   let sponsoredTransactions = await engine.getSponsoredTransactions();
 
-  //let gasEstimates = await Promise.all(sponsoredTransactions.slice(0,1).map(tx =>
   let gasEstimates = await Promise.all(
-    sponsoredTransactions.slice(0, -2).map((tx) =>
+    sponsoredTransactions.slice(0, -1).map((tx) =>
       provider.estimateGas({
         ...tx,
         from: tx.from === undefined ? walletExecutor.address : tx.from,
@@ -90,7 +89,6 @@ async function main() {
     )
   );
 
-  gasEstimates[gasEstimates.length] = BigNumber.from(100000);
   gasEstimates[gasEstimates.length] = BigNumber.from(100000);
 
   const gasEstimateTotal = gasEstimates.reduce(
